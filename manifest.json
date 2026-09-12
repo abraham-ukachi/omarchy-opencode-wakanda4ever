@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "Wakanda4Ever",
+  "name": "Wakanda4Ever",
+  "version": "0.1.0",
+  "author": "Abraham Ukachi",
+  "description": "Conversation dashboard: prompt counts, top session topics, and storage footprint with themed progress bars.",
+  "kinds": [
+    "panel",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "panel": "Main.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Wakanda4Ever",
+    "description": "Conversation dashboard toggle",
+    "category": "Info",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
