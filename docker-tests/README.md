@@ -4,7 +4,7 @@ A headless **Tier 1** test harness that exercises the plugin's *install
 pipeline* — the exact scripts Omarchy runs — inside a disposable Docker
 container, no desktop (or GPU) required.
 
-![idea](.github/wakanda4ever-dashboard.png)
+![Wakanda4Ever dashboard](../.github/wakanda4ever-dashboard.png)
 
 ## Why a container?
 

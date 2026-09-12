@@ -9,6 +9,10 @@ files, all in your Omarchy theme.
 
 <br>
 
+![Wakanda4Ever dashboard](.github/wakanda4ever-dashboard.png)
+
+<br>
+
 ## Demo / Usage
 
 ```sh
