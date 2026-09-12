@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# Fake `omarchy-shell` for headless plugin-install tests.
+#
+# The real `omarchy-shell` forwards IPC calls to the *running* Quickshell
+# process over Wayland. There is no display in the test container, so this
+# stub answers the three methods the plugin installer actually waits on:
+#
+#   - `shell rescanPlugins`   -> the shell rescans ~/.config/omarchy/plugins
+#   - `shell enablePlugin`    -> the shell activates a plugin + placement
+#   - `shell listPlugins`     -> the shell reports discovered plugins as JSON
+#
+# The last one is answered from the REAL omarchy-plugin-catalog (also on
+# PATH), so the JSON shape the installer polls matches production. Every call
+# is also appended to /work/omarchy-shell.log so the harness can assert which
+# IPC messages were sent (and how often).
+
+echo "$*" >> /work/omarchy-shell.log
+
+method=""
+for arg in "$@"; do
+  case "$arg" in
+    rescanPlugins | enablePlugin | listPlugins) method="$arg" ;;
+  esac
+done
+
+case "$method" in
+  listPlugins)
+    omarchy-plugin-catalog 2>/dev/null | jq '[ .[] | {
+      id: .id,
+      enabled: true,
+      firstParty: false,
+      kinds: (.kinds // []),
+      name: (.name // .id)
+    } ]'
+    ;;
+  rescanPlugins | enablePlugin)
+    echo "ok"
+    ;;
+  *)
+    echo "ok"
+    ;;
+esac
