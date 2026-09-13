@@ -38,30 +38,6 @@ outside the card.
 
 <br>
 
-## Uninstall
-
-```sh
-omarchy plugin remove Wakanda4Ever --yes
-omarchy restart shell
-```
-
-This unloads the bar button, the panel and the collector from your shell. A
-couple of leftovers are **not** touched, in case you want them back later:
-
-- `~/.local/state/omarchy/plugins/Wakanda4Ever/topics.json` — the collector's
-  topic-store cache (remove it if you want a clean slate).
-- the memory files from `setup.sh` — `~/.config/opencode/user-memory.md` and
-  `~/.config/opencode/conversation-log.md`, plus the `opencode.json`
-  instruction tweak (remove them if you no longer want OpenCode persistence):
-
-```sh
-rm -f ~/.local/state/omarchy/plugins/Wakanda4Ever/topics.json \
-      ~/.config/opencode/user-memory.md \
-      ~/.config/opencode/conversation-log.md
-```
-
-<br>
-
 ## Installation details
 
 The plugin also ships with an idempotent setup script that configures
@@ -84,6 +60,74 @@ bash setup.sh
 Afterwards, **restart opencode** (and `omarchy restart shell`) to apply.
 
 <br>
+
+
+## Uninstall
+
+```sh
+omarchy plugin remove Wakanda4Ever --yes
+omarchy restart shell
+```
+
+Uninstalling only removes the plugin (bar button, panel & collector) from your
+shell. **Your data is not touched** and goes right back on screen if you ever
+re-install it:
+
+- `~/.local/state/omarchy/plugins/Wakanda4Ever/topics.json` — the collector's
+  topic store (your accumulated topics, quotes & mention history),
+- `~/.config/opencode/user-memory.md`, `~/.config/opencode/conversation-log.md`
+  and the `opencode.json` instruction tweak — the OpenCode persistence set up
+  by `setup.sh`,
+- `~/.local/share/opencode/opencode.db` — OpenCode's own session history,
+  which the dashboard only reads.
+
+<br>
+
+## Permanent delete (full data purge)
+
+To wipe **everything** Wakanda4Ever ever stored — plugin, topic cache and the
+`setup.sh` persistence — run:
+
+```sh
+# 1. remove & unload the plugin from the shell
+omarchy plugin remove Wakanda4Ever --yes
+
+# 2. drop the dashboard's topic-store cache
+rm -rf ~/.local/state/omarchy/plugins/Wakanda4Ever
+
+# 3. remove the OpenCode memory files created by setup.sh
+rm -f ~/.config/opencode/user-memory.md ~/.config/opencode/conversation-log.md
+
+# 4. undo the `opencode.json` instruction tweak (drops the user-memory entry,
+#    keeping any other instructions & settings intact) - safe to run even if
+#    setup.sh was never used (jq fails silently, nothing gets overwritten)
+jq --arg um "$HOME/.config/opencode/user-memory.md" \
+   '(.instructions // null) as $c
+    | if $c == null then .
+      elif ($c | type) == "string"
+        then if $c == $um then .instructions = [] else . end
+      else .instructions = ($c | map(select(. != $um))) end' \
+   "$HOME/.config/opencode/opencode.json" > "$HOME/.config/opencode/opencode.json.tmp" \
+   && mv "$HOME/.config/opencode/opencode.json.tmp" "$HOME/.config/opencode/opencode.json"
+
+# 5. reload the shell once everything is gone
+omarchy restart shell
+```
+
+> **⚠️ Deliberately NOT included:** `~/.local/share/opencode/opencode.db` is
+> OpenCode's **entire session history** — deleting it erases all your
+> conversations & prompts, not just the dashboard's counts. Only do this if
+> you really want a brand-new OpenCode:
+
+```sh
+rm -f ~/.local/share/opencode/opencode.db \
+      ~/.local/share/opencode/opencode.db-wal \
+      ~/.local/share/opencode/opencode.db-shm
+```
+
+<br>
+
+
 
 ## How the data is collected
 
