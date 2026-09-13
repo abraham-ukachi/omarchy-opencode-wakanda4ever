@@ -2,6 +2,12 @@
 
 All notable changes to the **Wakanda4Ever** OpenCode conversation dashboard.
 
+## [0.2.0] - 2026-09-13
+
+### 🚀 Features
+
+- *(plugin)* Replace topic list with latest session titles & timestamps
+
 ## [0.1.2] - 2026-09-13
 
 ### 🐛 Bug Fixes

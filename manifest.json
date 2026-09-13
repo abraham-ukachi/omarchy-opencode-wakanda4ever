@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "wakanda4ever",
   "name": "Wakanda4Ever",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "author": "Abraham Ukachi",
   "description": "Conversation dashboard: persistent prompt counts, latest session titles & timestamps, and storage footprint with themed progress bars.",
   "kinds": [
