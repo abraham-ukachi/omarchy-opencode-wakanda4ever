@@ -1,0 +1,57 @@
+# git-cliff ~ configuration file
+# https://git-cliff.org/docs/configuration
+
+[changelog]
+header = """\
+# Changelog
+
+All notable changes to the **Wakanda4Ever** OpenCode conversation dashboard.
+
+"""
+# A Tera template rendered for each release in the changelog.
+body = """
+{% if version %}\
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [unreleased]
+{% endif %}\
+{% for entry in commits | commit_groups(groups=commit_parsers_groups) %}
+### {{ entry.group | striptags | trim | upper_first }}
+{% for commit in entry.commits %}
+- {% if commit.scope %}*({{ commit.scope }})* {% endif %}{{ commit.message | upper_first }}
+{% endfor %}
+{% endfor %}
+"""
+trim = true
+render_always = true
+
+[git]
+# Parse commits according to the conventional commits specification.
+conventional_commits = true
+# Rewrite gitmoji-style prefixes into conventional types before parsing,
+# so emoji-prefixed commits are typed correctly (and rendered cleanly).
+commit_preprocessors = [
+  { pattern = "^:bug:",            replace = "fix: " },
+  { pattern = "^:sparkles:|^:seedling:", replace = "feat: " },
+  { pattern = "^:memo:",           replace = "docs: " },
+  { pattern = "^:white_check_mark:", replace = "test: " },
+  { pattern = "^:bento:",          replace = "chore: " },
+]
+# Assign commits to groups (the release commit is always skipped).
+commit_parsers = [
+  { message = "^chore\\(release\\)",            skip = true },
+  { message = "^feat",                          group = "<!-- 0 -->🚀 Features" },
+  { message = "^fix",                           group = "<!-- 1 -->🐛 Bug Fixes" },
+  { message = "^refactor",                      group = "<!-- 2 -->🚜 Refactor" },
+  { message = "^doc",                           group = "<!-- 3 -->📚 Documentation" },
+  { message = "^perf",                          group = "<!-- 4 -->⚡ Performance" },
+  { message = "^style",                         group = "<!-- 5 -->🎨 Styling" },
+  { message = "^test",                          group = "<!-- 6 -->🧪 Testing" },
+  { message = "^chore|^ci",                     group = "<!-- 7 -->⚙️ Miscellaneous Tasks" },
+  { message = "^revert",                        group = "<!-- 9 -->◀️ Revert" },
+  { message = ".*",                             group = "<!-- 10 -->💼 Other" },
+]
+filter_commits = false
+fail_on_unmatched_commit = false
+topo_order_commits = true
+sort_commits = "oldest"
