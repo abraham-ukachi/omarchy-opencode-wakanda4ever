@@ -584,33 +584,6 @@ Panel {
           }
         }
 
-        // -------- DISK - used space meter --------
-        Item {
-          Layout.fillWidth: true
-          height: Style.space(5)
-
-          // the accent fill representing used disk space
-          Rectangle {
-            readonly property real fill: root.diskInfo && root.diskInfo.total
-              ? root.clamp((root.diskInfo.used || 0) / root.diskInfo.total, 0, 1) : 0
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            anchors.left: parent.left
-            width: parent.width * fill
-            radius: parent.height / 2
-            color: root.alpha(root.accent, 0.55)
-            Behavior on width {
-              NumberAnimation { duration: 450; easing.type: Easing.OutCubic }
-            }
-          }
-          // the (empty) track
-          Rectangle {
-            anchors.fill: parent
-            radius: parent.height / 2
-            color: root.alpha(root.fg, 0.08)
-          }
-        }
-
         // -------- Footer --------
         RowLayout {
           Layout.fillWidth: true
