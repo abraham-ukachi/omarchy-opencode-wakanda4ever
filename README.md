@@ -38,6 +38,30 @@ outside the card.
 
 <br>
 
+## Uninstall
+
+```sh
+omarchy plugin remove Wakanda4Ever --yes
+omarchy restart shell
+```
+
+This unloads the bar button, the panel and the collector from your shell. A
+couple of leftovers are **not** touched, in case you want them back later:
+
+- `~/.local/state/omarchy/plugins/Wakanda4Ever/topics.json` — the collector's
+  topic-store cache (remove it if you want a clean slate).
+- the memory files from `setup.sh` — `~/.config/opencode/user-memory.md` and
+  `~/.config/opencode/conversation-log.md`, plus the `opencode.json`
+  instruction tweak (remove them if you no longer want OpenCode persistence):
+
+```sh
+rm -f ~/.local/state/omarchy/plugins/Wakanda4Ever/topics.json \
+      ~/.config/opencode/user-memory.md \
+      ~/.config/opencode/conversation-log.md
+```
+
+<br>
+
 ## Installation details
 
 The plugin also ships with an idempotent setup script that configures
