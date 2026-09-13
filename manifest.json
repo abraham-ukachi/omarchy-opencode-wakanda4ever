@@ -4,7 +4,7 @@
   "name": "Wakanda4Ever",
   "version": "0.1.2",
   "author": "Abraham Ukachi",
-  "description": "Conversation dashboard: prompt counts, top session topics, and storage footprint with themed progress bars.",
+  "description": "Conversation dashboard: persistent prompt counts, latest session titles & timestamps, and storage footprint with themed progress bars.",
   "kinds": [
     "panel",
     "bar-widget"

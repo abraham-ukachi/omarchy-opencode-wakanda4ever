@@ -87,7 +87,7 @@ Panel {
   property int weekly: 0
   property int monthly: 0
   property int total: 0
-  property var topics: []
+  property var sessions: []
   property var files: []
   property var diskInfo: ({})
 
@@ -121,8 +121,8 @@ Panel {
     return (i === 0 ? String(n) : n.toFixed(1)) + " " + units[i]
   }
 
-  // get the topic object at index `i` (or `null` when out of range)
-  function topicAt(i) { return root.topics.length > i ? root.topics[i] : null }
+  // get the session object at index `i` (or `null` when out of range)
+  function sessionAt(i) { return root.sessions.length > i ? root.sessions[i] : null }
   // get the file (meter) object at index `i` (or `null` when out of range)
   function fileAt(i) { return root.files.length > i ? root.files[i] : null }
 
@@ -150,18 +150,6 @@ Panel {
   // close the dashboard (only when it's currently open)
   function ensureClosed() {
     if (root.opened) root.close()
-  }
-
-  // add comma separators to a number (e.g. `1234567` -> `1,234,567`)
-  function comma(n) {
-    n = Number(n) || 0
-    var s = String(Math.round(Math.abs(n)))
-    var out = ""
-    while (s.length > 3) {
-      out = "," + s.slice(-3) + out
-      s = s.slice(0, -3)
-    }
-    return (n < 0 ? "-" : "") + s + out
   }
 
 
@@ -202,7 +190,7 @@ Panel {
       weekly = Number(s.weekly) || 0
       monthly = Number(s.monthly) || 0
       total = Number(s.total) || 0
-      topics = Array.isArray(j.topics) ? j.topics : []
+      sessions = Array.isArray(j.sessions) ? j.sessions : []
       files = Array.isArray(j.files) ? j.files : []
       diskInfo = j.disk || {}
     } catch (e) {
@@ -212,14 +200,14 @@ Panel {
   }
 
 
-  // ======<<< TOPIC ROW - COMPONENT >>>======
-  // A single row in the `TOP 3 TOPICS` list: rank + label + quote + timestamp + bar
-  component TopicRow: RowLayout {
+  // ======<<< SESSION ROW - COMPONENT >>>======
+  // A single row in the `RECENT SESSIONS` list: rank + title + timestamp
+  component SessionRow: RowLayout {
     required property var modelData
     required property int position
     spacing: Style.space(10)
 
-    // `01`, `02`, `03` - rank badge (accent colored for the #1 topic)
+    // `01`, `02`, `03` - rank badge (accent colored for the newest session)
     Text {
       text: ("0" + (position + 1)).slice(-2)
       width: Style.space(24)
@@ -230,88 +218,31 @@ Panel {
       Layout.alignment: Qt.AlignVCenter
     }
 
-    // topic content: title line (label + quote) + subtitle line (date + mentions)
+    // session content: title line + timestamp line
     Column {
       Layout.fillWidth: true
       spacing: Style.space(3)
 
-      // -------- Title line --------
-      RowLayout {
-        width: parent.width
-        spacing: Style.space(6)
-
-        // topic label (e.g. `Omarchy`)
-        Text {
-          text: modelData && modelData.label ? modelData.label : "—"
-          color: root.fg
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-          font.weight: Font.Medium
-          elide: Text.ElideRight
-          Layout.alignment: Qt.AlignVCenter
-        }
-
-        // a subtle ` - ` separator between the label and the quote
-        Text {
-          text: " - "
-          visible: modelData && !!modelData.quote
-          color: root.alpha(root.muted, 0.7)
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.bodySmall
-          Layout.alignment: Qt.AlignVCenter
-        }
-
-        // the representative user quote (white & visible, just like the label)
-        Item {
-          Layout.fillWidth: true
-          Layout.preferredHeight: msg.implicitHeight
-          visible: modelData && !!modelData.quote
-
-          Text {
-            id: msg
-            anchors.fill: parent
-            text: modelData && modelData.quote ? modelData.quote : ""
-            color: root.fg
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            font.weight: Font.Medium
-            elide: Text.ElideRight
-          }
-
-          // a small gradient strip that fades the end of a truncated quote into the card
-          Rectangle {
-            visible: msg.text !== "" && modelData && modelData.quoteTrunc
-            width: parent.height
-            height: Style.space(64)
-            rotation: -90
-            x: parent.width - Style.space(32) - parent.height / 2
-            anchors.verticalCenter: parent.verticalCenter
-            gradient: Gradient {
-              GradientStop { position: 0.0; color: root.alpha(root.surface, 0) }
-              GradientStop { position: 1.0; color: root.surface }
-            }
-          }
-        }
-      }
-
-      // -------- Subtitle line (timestamped date + mention count) --------
+      // -------- Title line (the session title) --------
       Text {
         width: parent.width
-        text: (modelData && modelData.date ? modelData.date : "") + (modelData && modelData.count ? " · " + modelData.count + " mentions" : "")
+        text: modelData && modelData.title ? modelData.title : "—"
+        color: root.fg
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+        font.weight: Font.Medium
+        elide: Text.ElideRight
+      }
+
+      // -------- Timestamp line (date + time) --------
+      Text {
+        width: parent.width
+        text: modelData && modelData.date ? modelData.date : ""
         color: root.muted
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
         elide: Text.ElideRight
       }
-    }
-
-    // a horizontal bar that scales with the topic's relative mention count
-    Rectangle {
-      width: root.clamp((modelData && modelData.count ? modelData.count : 1) * Style.space(26), Style.space(6), Style.space(26))
-      height: Style.space(4)
-      radius: Style.space(2)
-      color: position === 0 ? root.accent : root.alpha(root.fg, 0.14)
-      Layout.alignment: Qt.AlignVCenter
     }
   }
 
@@ -469,7 +400,7 @@ Panel {
         }
         // brand subtitle
         Text {
-          text: "conversation dashboard"
+          text: "persistent conversation dashboard"
           color: root.muted
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
@@ -484,16 +415,6 @@ Panel {
           Layout.fillWidth: true
           spacing: Style.space(4)
 
-          // `PROMPTS · TOTAL` caption
-          Text {
-            text: "PROMPTS · TOTAL"
-            anchors.horizontalCenter: parent.horizontalCenter
-            color: root.muted
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            font.weight: Font.DemiBold
-            font.letterSpacing: Style.space(2)
-          }
           // the big compact number (e.g. `1.2k`)
           Text {
             text: root.total > 0 ? root.compact(root.total) : "0"
@@ -503,13 +424,15 @@ Panel {
             font.pixelSize: Style.font.displayLarge
             font.weight: Font.DemiBold
           }
-          // the full comma-separated number, faded below (e.g. `1,234`)
+          // `PROMPT` / `PROMPTS` caption below the count (singular when it's 1)
           Text {
-            text: root.total > 0 ? root.comma(root.total) : ""
+            text: root.total === 1 ? "PROMPT" : "PROMPTS"
             anchors.horizontalCenter: parent.horizontalCenter
-            color: root.alpha(root.muted, 0.6)
+            color: root.muted
             font.family: root.fontFamily
-            font.pixelSize: Style.font.body
+            font.pixelSize: Style.font.caption
+            font.weight: Font.DemiBold
+            font.letterSpacing: Style.space(2)
           }
         }
 
@@ -526,11 +449,11 @@ Panel {
           color: root.alpha(root.chrome, 0.35)
         }
 
-        // -------- TOP 3 TOPICS - section header --------
+        // -------- RECENT SESSIONS - section header --------
         RowLayout {
           Layout.fillWidth: true
           Text {
-            text: "TOP 3 TOPICS"
+            text: "RECENT SESSIONS"
             color: root.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -539,39 +462,39 @@ Panel {
           }
           Item { Layout.fillWidth: true }
           Text {
-            text: root.topics.length > 0 ? root.topics.length + " tracked" : ""
+            text: "latest 3"
             color: root.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
           }
         }
 
-        // the top 3 topic rows (sorted by date, then mention count)
-        TopicRow {
+        // the latest 3 sessions (sorted by most recent activity)
+        SessionRow {
           Layout.fillWidth: true
           position: 0
-          modelData: root.topicAt(0)
+          modelData: root.sessionAt(0)
           visible: !!modelData
         }
-        TopicRow {
+        SessionRow {
           Layout.fillWidth: true
           position: 1
-          modelData: root.topicAt(1)
+          modelData: root.sessionAt(1)
           visible: !!modelData
         }
-        TopicRow {
+        SessionRow {
           Layout.fillWidth: true
           position: 2
-          modelData: root.topicAt(2)
+          modelData: root.sessionAt(2)
           visible: !!modelData
         }
 
-        // friendly empty-state placeholder (when there are no topics yet)
+        // friendly empty-state placeholder (when there are no sessions yet)
         ColumnLayout {
-          visible: root.topics.length === 0
+          visible: root.sessions.length === 0
           Layout.fillWidth: true
           Text {
-            text: "Your session themes will appear here."
+            text: "Your latest sessions will appear here."
             color: root.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.bodySmall
@@ -709,8 +632,8 @@ Panel {
       }
 
       // -------- Refresh button (top-right of the card) --------
-      // Re-runs the collector on click, so the prompt total, the top topics
-      // and the memory footprint are always current & correctly displayed.
+      // Re-runs the collector on click, so the prompt total, the recent
+      // sessions and the memory footprint are always current & displayed.
       Item {
         id: refreshButton
         width: Style.space(28)

@@ -75,7 +75,7 @@ them, with a hint that the dereferenced stage step is missing.)
 - `make-fixture.py` — creates a fake-but-real-schema `opencode.db`, plus
   `conversation-log.md` / `user-memory.md`, under a throwaway HOME.
 - `check-payload.py` — asserts the `collect.py` JSON matches the dashboard
-  schema (stats / topics / files / disk / error).
+  schema (stats / sessions / files / disk / error).
 - `test-plugin.sh` — the phase runner + PASS/FAIL report.
 
 ## Next steps (future)

@@ -185,7 +185,7 @@ import json, sys
 p = json.load(open("/work/payload-empty.json"))
 assert p.get("error") == "", "expected an empty error string"
 assert p["stats"]["total"] == 0, f"expected total 0, got {p['stats']['total']}"
-assert p["topics"] == [], "expected no topics on an empty workspace"
+assert p["sessions"] == [], "expected no sessions on an empty workspace"
 assert len(p["files"]) == 3, "files list must still report the 3 known files"
 print("empty-workspace payload is graceful & complete")
 PYEOF

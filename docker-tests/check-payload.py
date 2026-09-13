@@ -34,7 +34,7 @@ def main():
     check("payload is an object", isinstance(payload, dict))
 
     # ---- required top-level keys ----
-    for key in ("stats", "topics", "files", "disk", "collectedAt", "error"):
+    for key in ("stats", "sessions", "files", "disk", "collectedAt", "error"):
         check(f"has top-level key '{key}'", key in payload)
 
     # ---- stats ----
@@ -44,28 +44,25 @@ def main():
     check("stats.total counts every user message (>= 8)",
           (stats.get("total") or 0) >= 8, f"total={stats.get('total')}")
 
-    # ---- topics ----
-    topics = payload.get("topics", [])
-    check("topics is a list", isinstance(topics, list))
-    check("topics has exactly 3 entries", len(topics) == 3, f"len={len(topics)}")
-    if topics:
-        t = topics[0]
-        for key in ("label", "count", "date", "quote", "quoteTrunc"):
-            check(f"topic[0] has '{key}'", key in t)
-        check("topic[0].count > 0", (t.get("count") or 0) > 0)
-        check("topic[0].label is capitalized", t.get("label", "")[:1].isupper(),
-              str(t.get("label")))
+    # ---- sessions ----
+    sessions = payload.get("sessions", [])
+    check("sessions is a list", isinstance(sessions, list))
+    check("sessions has exactly 3 entries", len(sessions) == 3,
+          f"len={len(sessions)}")
+    if sessions:
+        s = sessions[0]
+        check("session[0] has 'title'", isinstance(s.get("title"), str))
+        check("session[0] has 'date'", isinstance(s.get("date"), str),
+              str(s.get("date")))
 
-        labels = [str(t.get("label") or "").strip().lower() for t in topics]
-        quotes = [str(t.get("quote") or "") for t in topics]
-        check("no topic has an empty label",
-              all(labels), ", ".join(repr(l) for l in labels))
-        check("no topic has an empty message (quote)",
-              all(quotes), ", ".join(repr(q) for q in quotes))
-        check("no two topics share a label",
-              len(labels) == len(set(labels)))
-        check("no two topics share a message (quote)",
-              len(quotes) == len(set(quotes)))
+        titles = [str(t.get("title") or "").strip() for t in sessions]
+        dates = [str(t.get("date") or "") for t in sessions]
+        check("no session has an empty title",
+              all(titles), ", ".join(repr(t) for t in titles))
+        check("no session has an empty date/time",
+              all(dates), ", ".join(repr(d) for d in dates))
+        check("no two sessions share a title",
+              len(titles) == len(set(titles)))
 
     # ---- files ----
     files = payload.get("files", [])

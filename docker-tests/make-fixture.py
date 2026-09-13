@@ -54,20 +54,27 @@ CREATE TABLE `part` (
 );
 """
 
-# a session table just so the foreign keys above never complain
+# a session table matching the real OpenCode columns that collect.py reads
 SESSION_SCHEMA = """
 CREATE TABLE `session` (
   `id` text PRIMARY KEY,
   `directory` text NOT NULL,
+  `title` text NOT NULL,
+  `parent_id` text,
   `time_created` integer NOT NULL,
   `time_updated` integer NOT NULL,
-  `parent_id` text,
-  `data` text NOT NULL
+  `time_archived` integer
 );
 """
 
-# (text, days_ago) — recent enough to be counted by the 90-day windows,
-# spammy enough that the topic ranking finds the expected themes.
+# (id, title, days_ago) - the sessions the dashboard should surface
+SESSIONS = [
+    ("s1", "Wakanda4Ever docker plugin test", 1),
+    ("s2", "Prompt count graph brainstorm", 2),
+    ("s5", "Bluetooth toggle not working", 3),
+]
+
+# (text, days_ago) — recent enough to be counted by the 90-day prompt windows
 USER_MESSAGES = [
     ("Let's set up the Wakanda4Ever omarchy plugin and run it in a docker container",
      1),
@@ -119,9 +126,27 @@ def _seed_database():
     cur.execute(MESSAGE_SCHEMA)
     cur.execute(PART_SCHEMA)
 
+    # seed the real sessions (newest first) plus a few that must be hidden
+    for sid, title, days in SESSIONS:
+        ts = _ts(days)
+        cur.execute(
+            "INSERT INTO session (id, directory, title, parent_id, "
+            "time_created, time_updated, time_archived) "
+            "VALUES (?, '/tmp/demo', ?, NULL, ?, ?, NULL)",
+            (sid, title, ts, ts))
+    # a sub-agent session (child of s1) must never show up in the dashboard
+    ts = _ts(0)
     cur.execute(
-        "INSERT INTO session (id, directory, time_created, time_updated, data) "
-        "VALUES ('s1', '/tmp/demo', 0, 0, '{}')")
+        "INSERT INTO session (id, directory, title, parent_id, "
+        "time_created, time_updated, time_archived) "
+        "VALUES ('s4', '/tmp/demo', 'Explore omarchy bar widgets', 's1', ?, ?, NULL)",
+        (ts, ts))
+    # an archived session must never show up either
+    cur.execute(
+        "INSERT INTO session (id, directory, title, parent_id, "
+        "time_created, time_updated, time_archived) "
+        "VALUES ('s3', '/tmp/demo', 'Lighthouse beacon archives', NULL, ?, ?, ?)",
+        (ts, ts, ts))
 
     n_user, n_assistant = 0, 0
 
@@ -144,11 +169,6 @@ def _seed_database():
         else:
             n_assistant += 1
         return mid
-
-    # a non-text part must never show up in the topic quotes
-    cur.execute(
-        "INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) "
-        "VALUES ('p-notext', 'm-notext', 's1', 0, 0, '{\"type\": \"step-start\"}')")
 
     for text, days in USER_MESSAGES:
         add_message("user", text, days)

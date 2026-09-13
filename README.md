@@ -4,8 +4,8 @@
 
 A pocket-sized **Omarchy** bar & panel plugin that turns your **OpenCode**
 session history into a living, breathing dashboard right on your desktop —
-prompt counts, hot session topics, and the storage footprint of your memory
-files, all in your Omarchy theme.
+prompt counts, your latest session titles & timestamps, and the storage
+footprint of your memory files, all in your Omarchy theme.
 
 <br>
 
@@ -24,10 +24,10 @@ omarchy restart shell
 A **Wakanda4Ever** button shows up in your bar. Click it to open the
 dashboard:
 
-- **PROMPTS · TOTAL** — how many prompts OpenCode has ever processed (compact
-  `1.2k` big number + full `1,234` figure below it)
-- **TOP 3 TOPICS** — your hottest session themes, ranked by recency & mention
-  count, each with a representative *quote* from the actual conversation
+- **PROMPT / PROMPTS** — how many prompts OpenCode has ever processed (compact
+  `1.2k` big number, `PROMPT` when there's exactly one)
+- **RECENT SESSIONS** — your latest 3 OpenCode sessions, each with its title
+  and the date/time it was started, newest activity first
 - **MEMORY FOOTPRINT** — a log-scaled look at your `conversation-log.md`,
   `user-memory.md`, and the `opencode.db` database vs. a bounded budget
   (never more than `0.5%` of your free disk space)
@@ -73,32 +73,27 @@ Uninstalling only removes the plugin (bar button, panel & collector) from your
 shell. **Your data is not touched** and goes right back on screen if you ever
 re-install it:
 
-- `~/.local/state/omarchy/plugins/wakanda4ever/topics.json` — the collector's
-  topic store (your accumulated topics, quotes & mention history),
 - `~/.config/opencode/user-memory.md`, `~/.config/opencode/conversation-log.md`
   and the `opencode.json` instruction tweak — the OpenCode persistence set up
   by `setup.sh`,
 - `~/.local/share/opencode/opencode.db` — OpenCode's own session history,
-  which the dashboard only reads.
+  which the dashboard only reads (it keeps almost nothing of its own).
 
 <br>
 
 ## Permanent delete (full data purge)
 
-To wipe **everything** Wakanda4Ever ever stored — plugin, topic cache and the
-`setup.sh` persistence — run:
+To wipe **everything** Wakanda4Ever ever stored — plugin and the `setup.sh`
+persistence — run:
 
 ```sh
 # 1. remove & unload the plugin from the shell
 omarchy plugin remove wakanda4ever --yes
 
-# 2. drop the dashboard's topic-store cache
-rm -rf ~/.local/state/omarchy/plugins/wakanda4ever
-
-# 3. remove the OpenCode memory files created by setup.sh
+# 2. remove the OpenCode memory files created by setup.sh
 rm -f ~/.config/opencode/user-memory.md ~/.config/opencode/conversation-log.md
 
-# 4. undo the `opencode.json` instruction tweak (drops the user-memory entry,
+# 3. undo the `opencode.json` instruction tweak (drops the user-memory entry,
 #    keeping any other instructions & settings intact) - safe to run even if
 #    setup.sh was never used (jq fails silently, nothing gets overwritten)
 jq --arg um "$HOME/.config/opencode/user-memory.md" \
@@ -110,7 +105,7 @@ jq --arg um "$HOME/.config/opencode/user-memory.md" \
    "$HOME/.config/opencode/opencode.json" > "$HOME/.config/opencode/opencode.json.tmp" \
    && mv "$HOME/.config/opencode/opencode.json.tmp" "$HOME/.config/opencode/opencode.json"
 
-# 5. reload the shell once everything is gone
+# 4. reload the shell once everything is gone
 omarchy restart shell
 ```
 
@@ -134,13 +129,10 @@ rm -f ~/.local/share/opencode/opencode.db \
 Everything runs on your machine, no cloud involved:
 
 - `collect.py` queries the local OpenCode SQLite database (`opencode.db`) in
-  **read-only** mode to count `user` prompts and pull recent messages.
-- It ranks topics with a lightweight unigram + bigram TF-style heuristic
-  (stop-words & years filtered), keeps 60 days of daily counts, and persists
-  them under
-  `~/.local/state/omarchy/plugins/wakanda4ever/topics.json`.
-- It measures your memory files and disk, then prints a single JSON payload to
-  stdout for the QML panel to consume.
+  **read-only** mode to count `user` prompts and list the latest 3 sessions.
+- It skips sub-agent & archived sessions, stamps each with its start date and
+  time, and prints a single JSON payload to stdout for the QML panel to
+  consume.
 
 <br>
 
