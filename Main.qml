@@ -96,6 +96,7 @@ Panel {
   readonly property string fontFamily: Style.font.family
 
   // Define the live dashboard data (filled in by `applyData`)
+  property int today: 0
   property int daily: 0
   property int weekly: 0
   property int monthly: 0
@@ -263,6 +264,7 @@ Panel {
       }
       var j = JSON.parse(raw || "{}")
       var s = j.stats || {}
+      today = Number(s.today) || 0
       daily = Number(s.daily) || 0
       weekly = Number(s.weekly) || 0
       monthly = Number(s.monthly) || 0
@@ -497,29 +499,69 @@ Panel {
         // -------- A little breathing room --------
         Item { width: 1; height: Style.space(14) }
 
-        // -------- HERO - total prompt count (big & centered) --------
-        Column {
-          Layout.fillWidth: true
-          spacing: Style.space(4)
+        // -------- HERO - prompt counts (Total & Today) --------
+        RowLayout {
+          Layout.alignment: Qt.AlignHCenter
+          spacing: Style.space(32)
 
-          // the big compact number (e.g. `1.2k`)
-          Text {
-            text: root.total > 0 ? root.compact(root.total) : "0"
-            anchors.horizontalCenter: parent.horizontalCenter
-            color: root.fg
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.displayLarge
-            font.weight: Font.DemiBold
+          // Total Column
+          ColumnLayout {
+            spacing: Style.space(4)
+            Layout.alignment: Qt.AlignVCenter
+            Text {
+              text: root.total > 0 ? root.compact(root.total) : "0"
+              Layout.alignment: Qt.AlignHCenter
+              color: root.fg
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.displayLarge
+              font.weight: Font.DemiBold
+            }
+            Text {
+              text: root.total === 1 ? "PROMPT" : "PROMPTS"
+              Layout.alignment: Qt.AlignHCenter
+              color: root.muted
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              font.weight: Font.DemiBold
+              font.letterSpacing: Style.space(2)
+            }
           }
-          // `PROMPT` / `PROMPTS` caption below the count (singular when it's 1)
-          Text {
-            text: root.total === 1 ? "PROMPT" : "PROMPTS"
-            anchors.horizontalCenter: parent.horizontalCenter
-            color: root.muted
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            font.weight: Font.DemiBold
-            font.letterSpacing: Style.space(2)
+
+          // Vertical Divider with equal horizontal margins
+          Item {
+            Layout.alignment: Qt.AlignVCenter
+            Layout.preferredWidth: 1
+            Layout.preferredHeight: Style.space(48)
+            Layout.leftMargin: Style.space(8)
+            Layout.rightMargin: Style.space(8)
+
+            Rectangle {
+              anchors.fill: parent
+              color: root.alpha(root.chrome, 0.4)
+            }
+          }
+
+          // Today Column
+          ColumnLayout {
+            spacing: Style.space(4)
+            Layout.alignment: Qt.AlignVCenter
+            Text {
+              text: root.today > 0 ? root.compact(root.today) : "0"
+              Layout.alignment: Qt.AlignHCenter
+              color: root.fg
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.displayLarge
+              font.weight: Font.DemiBold
+            }
+            Text {
+              text: "TODAY"
+              Layout.alignment: Qt.AlignHCenter
+              color: root.muted
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              font.weight: Font.DemiBold
+              font.letterSpacing: Style.space(2)
+            }
           }
         }
 

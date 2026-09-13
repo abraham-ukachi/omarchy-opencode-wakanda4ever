@@ -39,7 +39,7 @@ def main():
 
     # ---- stats ----
     stats = payload.get("stats", {})
-    for key in ("daily", "weekly", "monthly", "total"):
+    for key in ("daily", "weekly", "monthly", "total", "today"):
         check(f"stats has '{key}'", isinstance(stats.get(key), int))
     check("stats.total counts every user message (>= 8)",
           (stats.get("total") or 0) >= 8, f"total={stats.get('total')}")

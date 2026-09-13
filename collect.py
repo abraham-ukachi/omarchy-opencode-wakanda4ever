@@ -128,9 +128,9 @@ def recent_sessions(limit=3):
 
 
 def prompt_counts():
-    """Counts all user prompts (total + daily/weekly/monthly averages).
+    """Counts all user prompts (today + daily/weekly/monthly averages + total).
 
-    :returns: a { daily, weekly, monthly, total } dict
+    :returns: a { today, daily, weekly, monthly, total } dict
     :type: { dict }
     """
     try:
@@ -149,16 +149,22 @@ def prompt_counts():
         total = int(cur.execute(
             "SELECT COUNT(*) FROM message "
             "WHERE json_extract(data, '$.role') = 'user'").fetchone()[0] or 0)
+        
+        # prompts today (since midnight today)
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start_ms = int(calendar.timegm(today_start.timetuple()) * 1000)
+        today_count = since(today_start_ms)
+
         # daily/weekly/monthly averages (simple rolling windows)
         daily = round(since(now_ms - 7 * 86400000) / 7)
         weekly = round(since(now_ms - 56 * 86400000) / 8)
         monthly = round(since(now_ms - 180 * 86400000) / 6)
         conn.close()
-        return {"daily": daily, "weekly": weekly, "monthly": monthly,
+        return {"today": today_count, "daily": daily, "weekly": weekly, "monthly": monthly,
                 "total": total}
     except (sqlite3.Error, OSError):
         # NOTE: no opencode database yet (or it's locked) -> stay calm
-        return {"daily": 0, "weekly": 0, "monthly": 0, "total": 0}
+        return {"today": 0, "daily": 0, "weekly": 0, "monthly": 0, "total": 0}
 
 
 def build():
