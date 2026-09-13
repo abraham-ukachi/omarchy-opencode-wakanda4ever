@@ -79,6 +79,7 @@ Everything runs on your machine, no cloud involved:
 ## Files
 
 ```
+LICENSE                # MIT license
 manifest.json          # plugin manifest (panel + bar-widget)
 BarWidget.qml          # bar button that toggles the dashboard
 Main.qml               # the dashboard panel (overlay window + card UI)
@@ -101,4 +102,4 @@ templates/
 
 ## License
 
-MIT — see each file header. **Wakanda Forever 🫶🏼**
+MIT — see [LICENSE](LICENSE) (and each file header). **Wakanda Forever 🫶🏼**
