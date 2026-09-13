@@ -65,7 +65,7 @@ Afterwards, **restart opencode** (and `omarchy restart shell`) to apply.
 ## Uninstall
 
 ```sh
-omarchy plugin remove Wakanda4Ever --yes
+omarchy plugin remove wakanda4ever --yes
 omarchy restart shell
 ```
 
@@ -73,7 +73,7 @@ Uninstalling only removes the plugin (bar button, panel & collector) from your
 shell. **Your data is not touched** and goes right back on screen if you ever
 re-install it:
 
-- `~/.local/state/omarchy/plugins/Wakanda4Ever/topics.json` — the collector's
+- `~/.local/state/omarchy/plugins/wakanda4ever/topics.json` — the collector's
   topic store (your accumulated topics, quotes & mention history),
 - `~/.config/opencode/user-memory.md`, `~/.config/opencode/conversation-log.md`
   and the `opencode.json` instruction tweak — the OpenCode persistence set up
@@ -90,10 +90,10 @@ To wipe **everything** Wakanda4Ever ever stored — plugin, topic cache and the
 
 ```sh
 # 1. remove & unload the plugin from the shell
-omarchy plugin remove Wakanda4Ever --yes
+omarchy plugin remove wakanda4ever --yes
 
 # 2. drop the dashboard's topic-store cache
-rm -rf ~/.local/state/omarchy/plugins/Wakanda4Ever
+rm -rf ~/.local/state/omarchy/plugins/wakanda4ever
 
 # 3. remove the OpenCode memory files created by setup.sh
 rm -f ~/.config/opencode/user-memory.md ~/.config/opencode/conversation-log.md
@@ -138,7 +138,7 @@ Everything runs on your machine, no cloud involved:
 - It ranks topics with a lightweight unigram + bigram TF-style heuristic
   (stop-words & years filtered), keeps 60 days of daily counts, and persists
   them under
-  `~/.local/state/omarchy/plugins/Wakanda4Ever/topics.json`.
+  `~/.local/state/omarchy/plugins/wakanda4ever/topics.json`.
 - It measures your memory files and disk, then prints a single JSON payload to
   stdout for the QML panel to consume.
 

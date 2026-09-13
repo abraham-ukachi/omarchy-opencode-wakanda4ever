@@ -57,9 +57,9 @@ USER_MEM = os.path.join(HOME, ".config/opencode/user-memory.md")
 DB_FILE = os.path.join(HOME, ".local/share/opencode/opencode.db")
 
 # - Wakanda4Ever paths
-PLUGIN_DIR = os.path.join(HOME, ".config/omarchy/plugins/Wakanda4Ever")
+PLUGIN_DIR = os.path.join(HOME, ".config/omarchy/plugins/wakanda4ever")
 TOPICS_STORE = os.path.join(
-    HOME, ".local/state/omarchy/plugins/Wakanda4Ever/topics.json")
+    HOME, ".local/state/omarchy/plugins/wakanda4ever/topics.json")
 
 # - Stop words & `year` words ignored while ranking conversation topics
 # (so the top-3 topics actually mean something ;))

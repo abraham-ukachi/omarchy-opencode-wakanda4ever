@@ -68,7 +68,7 @@ Panel {
   ipcTarget: "Wakanda4Ever"
 
   // path to the `collect.py` python script (same folder as this qml file)
-  readonly property string collectPath: Quickshell.env("HOME") + "/.config/omarchy/plugins/Wakanda4Ever/collect.py"
+  readonly property string collectPath: Quickshell.env("HOME") + "/.config/omarchy/plugins/wakanda4ever/collect.py"
   // how often (in seconds) the dashboard refreshes its live data
   readonly property int refreshSec: 60
 

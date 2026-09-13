@@ -87,8 +87,8 @@ if (( HAS_OMARCHY )); then
   if HOME="$ADD_HOME" omarchy-plugin-add /src --enable --yes; then
     pass "omarchy plugin add /src --enable --yes exited 0"
 
-    PLUGIN_DIR="$ADD_HOME/.config/omarchy/plugins/Wakanda4Ever"
-    assert "plugin landed in ~/.config/omarchy/plugins/Wakanda4Ever" \
+    PLUGIN_DIR="$ADD_HOME/.config/omarchy/plugins/wakanda4ever"
+    assert "plugin landed in ~/.config/omarchy/plugins/wakanda4ever" \
       test -d "$PLUGIN_DIR"
     assert "key files were installed (Main.qml, BarWidget.qml, manifest.json)" \
       bash -c "test -f '$PLUGIN_DIR/Main.qml' && test -f '$PLUGIN_DIR/BarWidget.qml' && test -f '$PLUGIN_DIR/manifest.json'"
@@ -98,7 +98,7 @@ if (( HAS_OMARCHY )); then
       grep -q rescanPlugins /work/omarchy-shell.log
     assert "shell was told to enable the plugin" \
       grep -q enablePlugin /work/omarchy-shell.log
-    assert "plugin id is enabled in the manifest-enabled state (Wakanda4Ever dir exists)" \
+    assert "plugin id is enabled in the manifest-enabled state (wakanda4ever dir exists)" \
       test -d "$PLUGIN_DIR"
   else
     fail "omarchy plugin add exited non-zero"
