@@ -4,7 +4,7 @@
 # Name: Wakanda4Ever - Collector
 # Script: collect.py
 # Author: Abraham Ukachi <abrahamukachi@gmail.com>
-# Version: 0.1.0
+# Version: 0.1.1
 #
 # Usage:
 #   1-|> python3 collect.py
