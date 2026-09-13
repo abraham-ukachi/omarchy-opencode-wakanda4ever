@@ -2,6 +2,21 @@
 
 All notable changes to the **Wakanda4Ever** OpenCode conversation dashboard.
 
+## [0.2.1] - 2026-09-13
+
+### 🚜 Refactor
+
+- *(plugin)* Drop the disk progress meter
+
+- *(plugin)* Remove the manual refresh button
+
+- *(plugin)* Remove the footer row
+
+
+### 📚 Documentation
+
+- Update dashboard screenshot
+
 ## [0.2.0] - 2026-09-13
 
 ### 🚀 Features
