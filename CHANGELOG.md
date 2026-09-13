@@ -2,6 +2,12 @@
 
 All notable changes to the **Wakanda4Ever** OpenCode conversation dashboard.
 
+## [0.1.2] - 2026-09-13
+
+### 🐛 Bug Fixes
+
+- Lowercase plugin id to satisfy the Quattro contract
+
 ## [0.1.1] - 2026-09-13
 
 ### 🚀 Features
