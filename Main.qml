@@ -583,25 +583,6 @@ Panel {
             Layout.alignment: Qt.AlignVCenter
           }
         }
-
-        // -------- Footer --------
-        RowLayout {
-          Layout.fillWidth: true
-          Text {
-            text: "updated live · click outside to close"
-            color: root.alpha(root.muted, 0.7)
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-          Item { Layout.fillWidth: true }
-          Text {
-            text: "forever."
-            color: root.alpha(root.accent, 0.7)
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            font.weight: Font.DemiBold
-          }
-        }
       }
     }
   }
