@@ -56,6 +56,17 @@ def main():
         check("topic[0].label is capitalized", t.get("label", "")[:1].isupper(),
               str(t.get("label")))
 
+        labels = [str(t.get("label") or "").strip().lower() for t in topics]
+        quotes = [str(t.get("quote") or "") for t in topics]
+        check("no topic has an empty label",
+              all(labels), ", ".join(repr(l) for l in labels))
+        check("no topic has an empty message (quote)",
+              all(quotes), ", ".join(repr(q) for q in quotes))
+        check("no two topics share a label",
+              len(labels) == len(set(labels)))
+        check("no two topics share a message (quote)",
+              len(quotes) == len(set(quotes)))
+
     # ---- files ----
     files = payload.get("files", [])
     check("files is a list", isinstance(files, list))

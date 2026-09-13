@@ -270,13 +270,17 @@ def _quote_excerpt(text, maxlen=64):
     return tail + "...", True
 
 
-def _quote_for(phrase, msgs):
+def _quote_for(phrase, msgs, taken=None):
     """Finds the most recent user message matching a topic `phrase`.
 
     The matched message becomes the topic's representative quote & date.
+    When `taken` is given it's a set of quote excerpts already claimed by
+    other topics; any message whose excerpt is already taken is skipped, so
+    no two topics ever share the same message.
 
     :param { str } phrase: the topic phrase to look for
     :param { list[dict] } msgs: the (newest-first) user messages
+    :param { set } taken: quote excerpts already used by other topics
     :returns: (quote, date, truncated); `date` is a `YYYY-MM-DD HH:MM` string
     :type: { tuple }
     """
@@ -292,6 +296,8 @@ def _quote_for(phrase, msgs):
         if not pat.search(m["text"].lower()):
             continue
         quote, truncated = _quote_excerpt(m["text"])
+        if taken is not None and quote in taken:
+            continue
         # timestamp the quote's conversation (date + 24h time)
         date = datetime.fromtimestamp(m["ts"] / 1000.0).strftime("%Y-%m-%d %H:%M")
         return quote, date, truncated
@@ -359,13 +365,39 @@ def read_topics():
         (e for e in store.values() if e.get("count", 0) > 0),
         key=lambda e: (e.get("date") or today, e.get("count", 0)),
         reverse=True)
-    return [
-        {"label": e["label"], "count": e["count"],
-         "date": e.get("date") or max((e.get("days") or {}).keys() or [today]),
-         "quote": e.get("quote", ""),
-         "quoteTrunc": bool(e.get("quoteTrunc"))}
-        for e in ranked[:3]
-    ]
+
+    # only keep well-formed, distinct topics: a topic must never have an
+    # empty label or an empty message, and no two topics may share the same
+    # label or the same message - when a candidate would violate that, keep
+    # looking and let the next topic take its place
+    used_labels, used_quotes = set(), set()
+    topics = []
+    for e in ranked:
+        label = (e.get("label") or "").strip()
+        if not label:
+            continue
+        key = re.sub(r"\s{2,}", " ", label).lower()
+        if key in used_labels:
+            continue
+        # the freshest matching message, skipping ones already claimed
+        quote, qdate, truncated = _quote_for(key, msgs, taken=used_quotes)
+        # fall back to a stored (still unique) message when nothing fresh matches
+        if not quote and e.get("quote") and e["quote"] not in used_quotes:
+            quote, qdate, truncated = e["quote"], e.get("date"), \
+                bool(e.get("quoteTrunc"))
+        if not quote:
+            continue  # never show a topic without a message
+        used_labels.add(key)
+        used_quotes.add(quote)
+        topics.append({
+            "label": label, "count": e["count"],
+            "date": qdate or e.get("date")
+                    or max((e.get("days") or {}).keys() or [today]),
+            "quote": quote,
+            "quoteTrunc": bool(truncated)})
+        if len(topics) == 3:
+            break
+    return topics
 
 
 def prompt_counts():
