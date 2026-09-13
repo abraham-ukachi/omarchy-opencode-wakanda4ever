@@ -6,8 +6,9 @@
 # Author: Abraham Ukachi <abrahamukachi@gmail.com>
 #
 # Usage:
-#   1-|> bash scripts/release.sh          (bump the MINOR version: 0.1.0 -> 0.2.0)
-#   2-|> bash scripts/release.sh --major  (bump the MAJOR version: 0.2.0 -> 1.0.0)
+#   1-|> bash scripts/release.sh          (auto-bump the PATCH version: 0.1.0 -> 0.1.1)
+#   2-|> bash scripts/release.sh --minor  (bump the MINOR version:     0.1.1 -> 0.2.0)
+#   3-|> bash scripts/release.sh --major  (bump the MAJOR version:     0.2.0 -> 1.0.0)
 #
 # What it does:
 #   - bumps the version in `manifest.json` & the `collect.py` header,
@@ -18,11 +19,14 @@
 
 set -euo pipefail
 
-# default to a minor bump (major only when explicitly requested)
-BUMP=minor
-if [[ "${1:-}" == "--major" ]]; then
-  BUMP=major
-fi
+# default to a patch bump; minor & major only when explicitly requested
+BUMP=patch
+case "${1:-}" in
+  --minor) BUMP=minor ;;
+  --major) BUMP=major ;;
+  "") : ;;
+  *) echo "release: unknown flag '$1' (use --minor or --major)" >&2; exit 1 ;;
+esac
 
 # fail loudly on missing tools
 for tool in jq sed git-cliff; do
@@ -47,11 +51,11 @@ COLLECTOR="collect.py"
 # read the current version & compute the next one
 CUR="$(jq -r '.version' "$MANIFEST")"
 IFS='.' read -r MAJ MIN PAT <<<"$CUR"
-if [[ $BUMP == major ]]; then
-  NEW="$((MAJ + 1)).0.0"
-else
-  NEW="$MAJ.$((MIN + 1)).0"
-fi
+case $BUMP in
+  major) NEW="$((MAJ + 1)).0.0" ;;
+  minor) NEW="$MAJ.$((MIN + 1)).0" ;;
+  *)     NEW="$MAJ.$MIN.$((PAT + 1))" ;;
+esac
 echo "release: $CUR -> $NEW ($BUMP bump)"
 
 # update the versioned files
