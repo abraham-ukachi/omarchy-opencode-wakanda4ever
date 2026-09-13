@@ -707,6 +707,73 @@ Panel {
           }
         }
       }
+
+      // -------- Refresh button (top-right of the card) --------
+      // Re-runs the collector on click, so the prompt total, the top topics
+      // and the memory footprint are always current & correctly displayed.
+      Item {
+        id: refreshButton
+        width: Style.space(28)
+        height: Style.space(28)
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.topMargin: Style.space(10)
+        anchors.rightMargin: Style.space(12)
+
+        // the (accent tinted) hover/press pill behind the glyph
+        Rectangle {
+          anchors.fill: parent
+          radius: parent.height / 2
+          color: refreshMouse.hovered || refreshMouse.pressed || collect.running
+            ? root.alpha(root.accent, 0.14)
+            : root.alpha(root.fg, 0.06)
+          Behavior on color {
+            ColorAnimation { duration: 150; easing.type: Easing.OutCubic }
+          }
+        }
+
+        // the refresh glyph (spins while a refresh is in flight)
+        Text {
+          id: refreshGlyph
+          anchors.centerIn: parent
+          text: "\uF021"
+          color: refreshMouse.hovered || refreshMouse.pressed || collect.running
+            ? root.accent : root.muted
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.icon
+          font.weight: Font.DemiBold
+          renderType: Text.NativeRendering
+          transformOrigin: Item.Center
+
+          // keep the glyph spinning for as long as the collector runs
+          property bool spinning: collect.running
+          onSpinningChanged: {
+            if (spinning) { rotation = 0; spin.restart() }
+            else { spin.stop(); rotation = 0 }
+          }
+        }
+
+        // the infinite right-turn animation (restarted by `refreshGlyph`)
+        NumberAnimation {
+          id: spin
+          target: refreshGlyph
+          property: "rotation"
+          from: 0
+          to: 360
+          duration: 900
+          easing.type: Easing.Linear
+          loops: Animation.Infinite
+        }
+
+        MouseArea {
+          id: refreshMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          // NOTE: re-runs the collector (a no-op while one is already running)
+          onClicked: root.run()
+        }
+      }
     }
   }
 }
