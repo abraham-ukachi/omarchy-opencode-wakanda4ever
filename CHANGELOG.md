@@ -2,6 +2,21 @@
 
 All notable changes to the **Wakanda4Ever** OpenCode conversation dashboard.
 
+## [0.2.2] - 2026-09-15
+
+### 🐛 Bug Fixes
+
+- Harden collector process & cap session titles
+
+
+### ⚙️ Miscellaneous Tasks
+
+- Optimize images (#1)
+
+- :bento: Add preview.png of dashboard to root
+
+- Remove wakanda4ever-dashboard.png from ./github dir
+
 ## [0.2.1] - 2026-09-13
 
 ### 🚜 Refactor
