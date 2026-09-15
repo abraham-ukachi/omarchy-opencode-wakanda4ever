@@ -50,6 +50,9 @@ CONV_LOG = os.path.join(HOME, ".config/opencode/conversation-log.md")
 USER_MEM = os.path.join(HOME, ".config/opencode/user-memory.md")
 DB_FILE = os.path.join(HOME, ".local/share/opencode/opencode.db")
 
+# - how long a single session title may be (bounds the final JSON payload)
+MAX_TITLE_LEN = 200  # <- cap any single title so it can never bloat the output
+
 
 # ======== PUBLIC FUNCTIONS
 
@@ -109,8 +112,11 @@ def recent_sessions(limit=3):
             "ORDER BY time_updated DESC LIMIT ?",
             (limit,)).fetchall()
         for title, ts in rows:
+            title = str(title).strip()
+            if len(title) > MAX_TITLE_LEN:
+                title = title[:MAX_TITLE_LEN - 1].rstrip() + "…"
             sessions.append({
-                "title": str(title).strip(),
+                "title": title,
                 "date": datetime.fromtimestamp(
                     ts / 1000.0).strftime("%Y-%m-%d %H:%M"),
             })

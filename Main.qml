@@ -67,10 +67,23 @@ Panel {
   moduleName: "Wakanda4Ever"
   ipcTarget: "Wakanda4Ever"
 
+  // the user's home directory (anchor for the allowlisted child environment)
+  readonly property string home: Quickshell.env("HOME")
   // path to the `collect.py` python script (same folder as this qml file)
-  readonly property string collectPath: Quickshell.env("HOME") + "/.config/omarchy/plugins/wakanda4ever/collect.py"
+  readonly property string collectPath: root.home + "/.config/omarchy/plugins/wakanda4ever/collect.py"
   // how often (in seconds) the dashboard refreshes its live data
   readonly property int refreshSec: 60
+  // trusted absolute interpreter used to launch `collect.py` (never PATH-resolved)
+  readonly property string pythonPath: "/usr/bin/python3"
+  // hard ceiling (in bytes) for a single collector payload before it is rejected
+  readonly property int maxCollectBytes: 262144
+  // hard deadline (in ms) after which a stuck collector is killed & reaped
+  readonly property int collectDeadlineMs: 15000
+  // longest session title / date allowed through to the UI layer
+  readonly property int maxTitleLen: 160
+  readonly property int maxDateLen: 40
+  // whether the last collection run was aborted (oversized / overdue output)
+  property bool collectAborted: false
 
   // Define the dashboard palette colors (borrowed from the omarchy `Color` & `Style` singletons)
   readonly property color fg: Color.popups.text
@@ -168,29 +181,98 @@ Panel {
   // spawn `collect.py` to gather the opencode conversation data as JSON
   Process {
     id: collect
-    command: ["python3", root.collectPath]
+    // trusted absolute interpreter + allowlisted environment (never bare PATH)
+    command: [root.pythonPath, root.collectPath]
     running: false
+    clearEnvironment: true
+    environment: ({
+      HOME: root.home,
+      LANG: null,
+      LC_ALL: null,
+      LC_TIME: null,
+      TZ: null,
+    })
     stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.applyData(text)
+      id: collectStdout
+      // NOTE: `waitForEnd: false` lets every incoming chunk fire `onDataChanged`,
+      //       so the raw output is byte-accounted *before* it can accumulate
+      waitForEnd: false
+      onDataChanged: {
+        if (collectStdout.data.byteLength > root.maxCollectBytes) {
+          console.warn("Wakanda4Ever: collector output exceeded " +
+                       root.maxCollectBytes + " bytes; aborting")
+          root.killCollector()
+        }
+      }
+      onStreamFinished: {
+        if (root.collectAborted) {
+          root.collectAborted = false
+          return
+        }
+        root.applyData(text)
+      }
+    }
+    onStarted: collectWatchdog.restart()
+    onExited: collectWatchdog.stop()
+  }
+
+  // hard termination & reap watchdog: kills any collector that overruns its deadline
+  Timer {
+    id: collectWatchdog
+    interval: root.collectDeadlineMs
+    repeat: false
+    onTriggered: {
+      if (collect.running) {
+        console.warn("Wakanda4Ever: collector exceeded its " +
+                     root.collectDeadlineMs + "ms deadline; killing it")
+        root.killCollector()
+      }
     }
   }
 
   // start a collection run (only when one isn't already running)
   function run() {
-    if (!collect.running) collect.running = true
+    if (!collect.running) {
+      collectAborted = false
+      collect.running = true
+    }
+  }
+
+  // kill & reap the collector process, abandoning its partial output
+  function killCollector() {
+    collectAborted = true
+    if (collect.running) {
+      collect.signal(9)        // SIGKILL - hard kill, leaves nothing to clean up
+      collect.running = false  // <- stops & reaps the process
+    }
+  }
+
+  // trim an arbitrary string down to a bounded display length
+  function boundedText(s, max) {
+    s = String(s || "").trim()
+    return s.length > max ? s.slice(0, Math.max(0, max - 1)) + "…" : s
   }
 
   // parse the JSON payload coming from `collect.py` & store it on the root
   function applyData(raw) {
     try {
+      // defensively reject anything larger than our hard cap
+      if (raw && raw.length > root.maxCollectBytes) {
+        console.warn("Wakanda4Ever: oversized collector output rejected")
+        return
+      }
       var j = JSON.parse(raw || "{}")
       var s = j.stats || {}
       daily = Number(s.daily) || 0
       weekly = Number(s.weekly) || 0
       monthly = Number(s.monthly) || 0
       total = Number(s.total) || 0
-      sessions = Array.isArray(j.sessions) ? j.sessions : []
+      sessions = (Array.isArray(j.sessions) ? j.sessions : []).map(function(entry) {
+        return {
+          title: root.boundedText(entry && entry.title, root.maxTitleLen),
+          date: root.boundedText(entry && entry.date, root.maxDateLen),
+        }
+      })
       files = Array.isArray(j.files) ? j.files : []
       diskInfo = j.disk || {}
     } catch (e) {
@@ -227,6 +309,7 @@ Panel {
       Text {
         width: parent.width
         text: modelData && modelData.title ? modelData.title : "—"
+        textFormat: Text.PlainText
         color: root.fg
         font.family: root.fontFamily
         font.pixelSize: Style.font.body
@@ -238,6 +321,7 @@ Panel {
       Text {
         width: parent.width
         text: modelData && modelData.date ? modelData.date : ""
+        textFormat: Text.PlainText
         color: root.muted
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
@@ -265,6 +349,7 @@ Panel {
       // meter label (e.g. `conversation log`)
       Text {
         text: modelData && modelData.label ? modelData.label : "—"
+        textFormat: Text.PlainText
         color: root.fg
         font.family: root.fontFamily
         font.pixelSize: Style.font.bodySmall
@@ -273,6 +358,7 @@ Panel {
       // current size vs. bounding limit
       Text {
         text: modelData ? root.humanBytes(modelData.bytes) + " of " + root.humanBytes(modelData.limit) : ""
+        textFormat: Text.PlainText
         color: root.muted
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
@@ -283,6 +369,7 @@ Panel {
       // the percentage text (accent when something is stored)
       Text {
         text: root.filePctText(modelData)
+        textFormat: Text.PlainText
         color: modelData && Number(modelData.bytes) > 0 ? root.fg : root.muted
         font.family: root.fontFamily
         font.pixelSize: Style.font.bodySmall
@@ -569,6 +656,7 @@ Panel {
           // free space (accent-colored, right aligned)
           Text {
             text: root.diskInfo && root.diskInfo.free ? root.humanBytes(root.diskInfo.free) + " free" : "—"
+            textFormat: Text.PlainText
             color: root.fg
             font.family: root.fontFamily
             font.pixelSize: Style.font.bodySmall
@@ -577,6 +665,7 @@ Panel {
           // total space (muted)
           Text {
             text: root.diskInfo && root.diskInfo.total ? "of " + root.humanBytes(root.diskInfo.total) : ""
+            textFormat: Text.PlainText
             color: root.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
