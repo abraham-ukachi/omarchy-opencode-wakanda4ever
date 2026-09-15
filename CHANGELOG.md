@@ -2,6 +2,12 @@
 
 All notable changes to the **Wakanda4Ever** OpenCode conversation dashboard.
 
+## [0.2.3] - 2026-09-15
+
+### 🚀 Features
+
+- Add today prompt count with vertical divider and label
+
 ## [0.2.2] - 2026-09-15
 
 ### 🐛 Bug Fixes
