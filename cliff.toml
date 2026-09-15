@@ -36,6 +36,10 @@ commit_preprocessors = [
   { pattern = "^:memo:",           replace = "docs: " },
   { pattern = "^:white_check_mark:", replace = "test: " },
   { pattern = "^:bento:",          replace = "chore: " },
+  { pattern = "^:lock:",           replace = "fix: " },
+  { pattern = "^:green_heart:",    replace = "chore: " },
+  { pattern = "^:poop:",           replace = "chore: " },
+  { pattern = "^\\[ImgBot\\]",     replace = "chore: " },
 ]
 # Assign commits to groups (the release commit is always skipped).
 commit_parsers = [
