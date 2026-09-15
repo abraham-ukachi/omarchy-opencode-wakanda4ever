@@ -9,7 +9,7 @@ footprint of your memory files, all in your Omarchy theme.
 
 <br>
 
-![Wakanda4Ever dashboard](.github/wakanda4ever-dashboard.png)
+![Wakanda4Ever dashboard preview](./preview.png)
 
 <br>
 
