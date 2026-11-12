@@ -187,12 +187,56 @@ assert p.get("error") == "", "expected an empty error string"
 assert p["stats"]["total"] == 0, f"expected total 0, got {p['stats']['total']}"
 assert p["sessions"] == [], "expected no sessions on an empty workspace"
 assert len(p["files"]) == 3, "files list must still report the 3 known files"
+assert p["memory"]["online"] is False, "expected AgentMemory to read as offline"
+assert p["memory"]["status"] == "offline", "expected an offline memory status"
 print("empty-workspace payload is graceful & complete")
 PYEOF
   assert "empty workspace produced a graceful, valid payload" true
 else
   fail "collect.py crashed on an empty workspace"
 fi
+
+echo
+say "======== Phase F - collect.py against a live AgentMemory daemon ========"
+AM_HOME=/home/agentmemory
+AM_PID=""
+rm -rf "$AM_HOME"
+mkdir -p "$AM_HOME/.agentmemory"
+HOME="$AM_HOME" python3 /tests/make-fixture.py >/dev/null
+printf 'wakanda-test-secret' > "$AM_HOME/.agentmemory/secret"
+
+FAKE_AM_PORT=3199 python3 /tests/fake-agentmemory.py >/work/fake-am.log 2>&1 &
+AM_PID=$!
+sleep 0.7
+
+if HOME="$AM_HOME" AGENTMEMORY_URL=http://127.0.0.1:3199 \
+    python3 /src/collect.py > /work/payload-am.json \
+    && python3 /tests/check-payload.py /work/payload-am.json --online; then
+  pass "collect.py consumed the AgentMemory REST API (counts, status & sessions)"
+else
+  fail "AgentMemory-backed payload checks reported a problem"
+fi
+
+# the bar widget's tiny probe must work through the same auth + endpoint
+if HOME="$AM_HOME" AGENTMEMORY_URL=http://127.0.0.1:3199 \
+    python3 /src/collect.py --status | python3 -c \
+    'import json,sys; p=json.load(sys.stdin); assert p["online"] is True and p["version"] == "9.9.9"'; then
+  pass "collect.py --status reports the live daemon for the bar widget"
+else
+  fail "collect.py --status did not report the live daemon"
+fi
+
+# a missing secret must degrade to a graceful offline payload, never crash
+rm -f "$AM_HOME/.agentmemory/secret"
+if HOME="$AM_HOME" AGENTMEMORY_URL=http://127.0.0.1:3199 \
+    python3 /src/collect.py 2>/dev/null | python3 -c \
+    'import json,sys; p=json.load(sys.stdin); assert p["memory"]["online"] is False and p["error"] == ""'; then
+  pass "a missing AgentMemory secret degrades to a graceful offline payload"
+else
+  fail "a missing secret broke the collector"
+fi
+
+[ -n "$AM_PID" ] && kill "$AM_PID" 2>/dev/null || true
 
 echo
 say "======== SUMMARY ========"

@@ -33,6 +33,7 @@ RUN apt-get update \
 COPY . /src
 # the test harness (harness script + fakes + python helpers)
 COPY docker-tests/check-payload.py docker-tests/make-fixture.py /tests/
+COPY docker-tests/fake-agentmemory.py /tests/
 COPY docker-tests/fakes /tests/fakes
 COPY docker-tests/test-plugin.sh /tests/test-plugin.sh
 

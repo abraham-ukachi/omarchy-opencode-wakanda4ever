@@ -112,6 +112,6 @@ fi
 printf "\n─────────  Wakanda4Ever — OpenCode is now persistent 🫶🏼\n"
 printf "   · every session, OpenCode loads your \033[1muser-memory.md\033[0m\n"
 printf "   · every exchange is silently appended to \033[1mconversation-log.md\033[0m\n"
-printf "   · the dashboard reads both files + the opencode database\n"
+printf "   · the dashboard reads AgentMemory, these files & the opencode database\n"
 printf "\nRestart \033[1mopencode\033[0m (and the \033[1momarchy shell\033[0m) to apply the changes.\n"
 printf "   · shell: \033[1momarchy restart shell\033[0m\n"

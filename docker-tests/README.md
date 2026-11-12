@@ -23,6 +23,7 @@ container, no desktop (or GPU) required.
 | **C** | `collect.py` over a synthetic opencode database + memory files → schema-valid JSON | fixture + assertions |
 | **D** | `setup.sh` idempotency + "never wipes your memory files" guard | bash assertions |
 | **E** | `collect.py` tolerates a completely empty workspace | assert graceful payload |
+| **F** | `collect.py` against a live (fake) AgentMemory daemon: REST auth, counts, status & sessions | `fake-agentmemory.py` + assertions |
 
 Only `omarchy-shell` is faked (`docker-tests/fakes/`): in production it talks
 to the running Quickshell over Wayland, which doesn't exist inside this
@@ -74,8 +75,11 @@ them, with a hint that the dereferenced stage step is missing.)
   logging every call to `/work/omarchy-shell.log`.
 - `make-fixture.py` — creates a fake-but-real-schema `opencode.db`, plus
   `conversation-log.md` / `user-memory.md`, under a throwaway HOME.
+- `fake-agentmemory.py` — a test-only daemon stub serving `/agentmemory/counts`,
+  `/status` and `/sessions` behind the same bearer auth as the real thing.
 - `check-payload.py` — asserts the `collect.py` JSON matches the dashboard
-  schema (stats / sessions / files / disk / error).
+  schema (memory / stats / sessions / files / disk / error), with `--online`
+  for the live-daemon phase.
 - `test-plugin.sh` — the phase runner + PASS/FAIL report.
 
 ## Next steps (future)

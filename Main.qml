@@ -24,7 +24,7 @@
 * SOFTWARE.
 *
 * @project: omarchy-opencode-wakanda4ever
-* @name: Wakanda4Ever - Conversation Dashboard - Panel
+* @name: Wakanda4Ever - AgentMemory Dashboard - Panel
 * @file: Main.qml
 * @type: QML
 * @authors: Abraham Ukachi <abrahamukachi@gmail.com>
@@ -64,8 +64,8 @@ import qs.Ui
 // ======<<< Wakanda4Ever - Panel >>>======
 Panel {
   id: root
-  moduleName: "Wakanda4Ever"
-  ipcTarget: "Wakanda4Ever"
+  moduleName: "wakanda4ever"
+  ipcTarget: "wakanda4ever"
 
   // the user's home directory (anchor for the allowlisted child environment)
   readonly property string home: Quickshell.env("HOME")
@@ -79,15 +79,18 @@ Panel {
   readonly property int maxCollectBytes: 262144
   // hard deadline (in ms) after which a stuck collector is killed & reaped
   readonly property int collectDeadlineMs: 15000
-  // longest session title / date allowed through to the UI layer
+  // longest session title / date / project allowed through to the UI layer
   readonly property int maxTitleLen: 160
   readonly property int maxDateLen: 40
+  readonly property int maxProjectLen: 32
   // whether the last collection run was aborted (oversized / overdue output)
   property bool collectAborted: false
 
   // Define the dashboard palette colors (borrowed from the omarchy `Color` & `Style` singletons)
   readonly property color fg: Color.popups.text
-  readonly property color muted: Color.muted
+  // NOTE: `Color.muted` sits too close to the popup surface in several themes,
+  //       so the panel derives its own muted tone from the foreground instead
+  readonly property color muted: root.alpha(root.fg, 0.55)
   readonly property color accent: Color.accent
   readonly property color urgent: Color.urgent
   readonly property color surface: Color.popups.background
@@ -95,7 +98,17 @@ Panel {
   // reference to the omarchy default font family
   readonly property string fontFamily: Style.font.family
 
-  // Define the live dashboard data (filled in by `applyData`)
+  // Define the live AgentMemory state (filled in by `applyData`)
+  property bool memoryOnline: false
+  property string memoryStatus: ""
+  property string memoryVersion: ""
+  property int memoryUptime: 0
+  property int memoryProblems: 0
+  property string memoryHeadline: ""
+  property var memoryCounts: ({})
+  property int memoryCheckedAt: 0
+
+  // Define the rest of the dashboard data (filled in by `applyData`)
   property int today: 0
   property int daily: 0
   property int weekly: 0
@@ -133,6 +146,67 @@ Panel {
     var i = 0
     while (n >= 1024 && i < units.length - 1) { n /= 1024; i++ }
     return (i === 0 ? String(n) : n.toFixed(1)) + " " + units[i]
+  }
+
+  // turn an uptime in seconds into a compact `3d 8h` / `8h 12m` / `12m` string
+  function humanUptime(raw) {
+    var s = Math.max(0, Number(raw) || 0)
+    var d = Math.floor(s / 86400)
+    var h = Math.floor((s % 86400) / 3600)
+    var m = Math.floor((s % 3600) / 60)
+    if (d > 0) return d + "d " + h + "h"
+    if (h > 0) return h + "h " + m + "m"
+    return m + "m"
+  }
+
+  // read one AgentMemory count (always a number)
+  function count(key) {
+    var c = root.memoryCounts || {}
+    return Number(c[key]) || 0
+  }
+
+  // whether we have ever received a real AgentMemory snapshot
+  function hasMemoryData() {
+    return Object.keys(root.memoryCounts || {}).length > 0
+  }
+
+  // a big count, or an em dash before the first successful snapshot
+  function countText(key) {
+    return root.hasMemoryData() ? root.compact(root.count(key)) : "—"
+  }
+
+  // the short human label for the daemon state
+  function statusLabel() {
+    if (!root.memoryOnline) return "OFFLINE"
+    var s = String(root.memoryStatus || "").toLowerCase()
+    if (s === "" || s === "ok" || s === "healthy") return "HEALTHY"
+    if (s === "warn" || s === "warning") return "ATTENTION"
+    if (s === "error" || s === "degraded" || s === "unhealthy") return "DEGRADED"
+    return s.toUpperCase()
+  }
+
+  // the accent color that matches the daemon state
+  function statusColor() {
+    if (!root.memoryOnline) return root.muted
+    var s = String(root.memoryStatus || "").toLowerCase()
+    if (s === "warn" || s === "warning" || s === "error" ||
+        s === "degraded" || s === "unhealthy")
+      return root.urgent
+    return root.accent
+  }
+
+  // a compact footer line (version, uptime, notices, last successful check)
+  function footerText() {
+    var bits = []
+    if (root.memoryVersion) bits.push("v" + root.memoryVersion)
+    if (root.memoryOnline && root.memoryUptime > 0)
+      bits.push("up " + root.humanUptime(root.memoryUptime))
+    if (!root.memoryOnline) bits.push("agentmemory offline")
+    if (root.memoryProblems > 0)
+      bits.push(root.memoryProblems + (root.memoryProblems === 1 ? " notice" : " notices"))
+    if (root.memoryCheckedAt > 0)
+      bits.push("checked " + Qt.formatTime(new Date(root.memoryCheckedAt * 1000), "hh:mm"))
+    return bits.join("  ·  ")
   }
 
   // get the session object at index `i` (or `null` when out of range)
@@ -179,7 +253,7 @@ Panel {
     onTriggered: root.run()
   }
 
-  // spawn `collect.py` to gather the opencode conversation data as JSON
+  // spawn `collect.py` to gather the AgentMemory & OpenCode data as JSON
   Process {
     id: collect
     // trusted absolute interpreter + allowlisted environment (never bare PATH)
@@ -263,18 +337,46 @@ Panel {
         return
       }
       var j = JSON.parse(raw || "{}")
+      var m = j.memory || {}
+
+      // ---- AgentMemory state (offline keeps the last known snapshot) ----
+      memoryOnline = m.online === true
+      memoryStatus = memoryOnline ? String(m.status || "healthy").toLowerCase() : "offline"
+      if (memoryOnline) {
+        if (m.version) memoryVersion = String(m.version)
+        memoryUptime = Number(m.uptime) || 0
+        memoryProblems = Number(m.problems) || 0
+        memoryHeadline = root.boundedText(m.headline, 180)
+        var counts = m.counts || {}
+        if (Object.keys(counts).length > 0) memoryCounts = counts
+        if (Number(m.checkedAt) > 0) memoryCheckedAt = Number(m.checkedAt)
+      } else {
+        // NOTE: deliberately keep `memoryCounts`, `memoryVersion` & the last
+        //       check time so the panel never flickers back to zeros
+        memoryProblems = 0
+        memoryHeadline = ""
+      }
+
+      // ---- OpenCode prompt stats ----
       var s = j.stats || {}
       today = Number(s.today) || 0
       daily = Number(s.daily) || 0
       weekly = Number(s.weekly) || 0
       monthly = Number(s.monthly) || 0
       total = Number(s.total) || 0
+
+      // ---- latest sessions (AgentMemory, or OpenCode as a fallback) ----
       sessions = (Array.isArray(j.sessions) ? j.sessions : []).map(function(entry) {
         return {
           title: root.boundedText(entry && entry.title, root.maxTitleLen),
           date: root.boundedText(entry && entry.date, root.maxDateLen),
+          project: root.boundedText(entry && entry.project, root.maxProjectLen),
+          observations: Number(entry && entry.observations) || 0,
+          status: root.boundedText(entry && entry.status, 20),
         }
       })
+
+      // ---- footprint meters & disk ----
       files = Array.isArray(j.files) ? j.files : []
       diskInfo = j.disk || {}
     } catch (e) {
@@ -284,8 +386,128 @@ Panel {
   }
 
 
+  // ======<<< STATUS PILL - COMPONENT >>>======
+  // A tiny dot + label that reflects the AgentMemory daemon state
+  component StatusPill: Rectangle {
+    readonly property color tint: root.statusColor()
+    implicitWidth: pillRow.implicitWidth + Style.space(16)
+    implicitHeight: Style.space(22)
+    radius: height / 2
+    color: root.alpha(tint, 0.10)
+    border.width: 1
+    border.color: root.alpha(tint, 0.35)
+
+    RowLayout {
+      id: pillRow
+      anchors.centerIn: parent
+      spacing: Style.space(5)
+
+      // a filled dot when online, a hollow ring when offline
+      Rectangle {
+        width: Style.space(6)
+        height: Style.space(6)
+        radius: width / 2
+        color: root.memoryOnline ? parent.parent.tint : "transparent"
+        border.width: root.memoryOnline ? 0 : 1
+        border.color: parent.parent.tint
+      }
+      Text {
+        text: root.statusLabel()
+        color: parent.parent.tint
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.weight: Font.DemiBold
+        font.letterSpacing: Style.space(1)
+      }
+    }
+  }
+
+
+  // ======<<< STAT BLOCK - COMPONENT >>>======
+  // A hero-sized number + its letter-spaced label
+  component StatBlock: ColumnLayout {
+    required property string value
+    required property string label
+    property bool strong: false
+    spacing: Style.space(2)
+
+    Text {
+      text: parent.value
+      Layout.alignment: Qt.AlignHCenter
+      color: parent.strong ? root.fg : root.alpha(root.fg, 0.78)
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.displayLarge
+      font.weight: Font.DemiBold
+    }
+    Text {
+      text: parent.label
+      Layout.alignment: Qt.AlignHCenter
+      color: root.muted
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.weight: Font.DemiBold
+      font.letterSpacing: Style.space(1)
+    }
+  }
+
+
+  // ======<<< MINI STAT - COMPONENT >>>======
+  // A small number + label, used in the secondary counters strip
+  component MiniStat: ColumnLayout {
+    required property string value
+    required property string label
+    spacing: Style.space(1)
+
+    Text {
+      text: parent.value
+      Layout.alignment: Qt.AlignHCenter
+      color: root.fg
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.body
+      font.weight: Font.DemiBold
+    }
+    Text {
+      text: parent.label
+      Layout.alignment: Qt.AlignHCenter
+      color: root.muted
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.letterSpacing: Style.space(1)
+    }
+  }
+
+
+  // ======<<< SECTION HEADER - COMPONENT >>>======
+  // A muted uppercase section title with an optional right-aligned hint
+  component SectionHeader: RowLayout {
+    required property string title
+    property string hint: ""
+    Layout.fillWidth: true
+    spacing: Style.space(8)
+
+    Text {
+      text: parent.title
+      color: root.muted
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      font.weight: Font.DemiBold
+      font.letterSpacing: Style.space(2)
+    }
+    Item { Layout.fillWidth: true }
+    Text {
+      text: parent.hint
+      visible: parent.hint !== ""
+      textFormat: Text.PlainText
+      color: root.alpha(root.muted, 0.7)
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      elide: Text.ElideRight
+    }
+  }
+
+
   // ======<<< SESSION ROW - COMPONENT >>>======
-  // A single row in the `RECENT SESSIONS` list: rank + title + timestamp
+  // A single row in the `RECENT SESSIONS` list: rank + title + meta + obs count
   component SessionRow: RowLayout {
     required property var modelData
     required property int position
@@ -302,7 +524,7 @@ Panel {
       Layout.alignment: Qt.AlignVCenter
     }
 
-    // session content: title line + timestamp line
+    // session content: title line + date/project line
     Column {
       Layout.fillWidth: true
       spacing: Style.space(3)
@@ -319,15 +541,55 @@ Panel {
         elide: Text.ElideRight
       }
 
-      // -------- Timestamp line (date + time) --------
-      Text {
+      // -------- Meta line (date · project, with an active dot) --------
+      RowLayout {
         width: parent.width
-        text: modelData && modelData.date ? modelData.date : ""
-        textFormat: Text.PlainText
-        color: root.muted
+        spacing: Style.space(5)
+
+        // a small accent dot while the session is still active
+        Rectangle {
+          width: Style.space(5)
+          height: Style.space(5)
+          radius: width / 2
+          visible: modelData && String(modelData.status || "") === "active"
+          color: root.accent
+          Layout.alignment: Qt.AlignVCenter
+        }
+        Text {
+          text: modelData
+            ? (modelData.date || "") +
+              (modelData.project ? "  ·  " + modelData.project : "")
+            : ""
+          textFormat: Text.PlainText
+          color: root.muted
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideRight
+          Layout.fillWidth: true
+        }
+      }
+    }
+
+    // observation count (only when AgentMemory knows about this session)
+    ColumnLayout {
+      visible: modelData && Number(modelData.observations) > 0
+      spacing: 0
+      Layout.alignment: Qt.AlignVCenter
+
+      Text {
+        text: modelData ? root.compact(modelData.observations) : ""
+        Layout.alignment: Qt.AlignHCenter
+        color: root.fg
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.bodySmall
+        font.weight: Font.DemiBold
+      }
+      Text {
+        text: "obs"
+        Layout.alignment: Qt.AlignHCenter
+        color: root.alpha(root.muted, 0.7)
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
-        elide: Text.ElideRight
       }
     }
   }
@@ -348,7 +610,7 @@ Panel {
       width: parent.width
       spacing: Style.space(8)
 
-      // meter label (e.g. `conversation log`)
+      // meter label (e.g. `agentmemory store`)
       Text {
         text: modelData && modelData.label ? modelData.label : "—"
         textFormat: Text.PlainText
@@ -439,7 +701,8 @@ Panel {
     Rectangle {
       id: card
       width: 500
-      height: 560
+      // keep the card usable on short screens; the content scrolls when needed
+      height: Math.min(620, window.height - Style.bar.sizeHorizontal - Style.space(26))
       radius: Math.max(Style.cornerRadius, 10)
       color: root.surface
       border.color: root.alpha(root.chrome, 0.5)
@@ -465,253 +728,263 @@ Panel {
         color: root.accent
       }
 
-      // -------- Card content column --------
-      ColumnLayout {
-        id: body
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.topMargin: Style.space(20)
-        anchors.bottomMargin: Style.space(18)
-        anchors.leftMargin: Style.space(20)
-        anchors.rightMargin: Style.space(20)
-        spacing: Style.space(12)
+      // -------- Scrollable card content --------
+      Flickable {
+        id: scroller
+        anchors.fill: parent
+        anchors.topMargin: Style.space(4)
+        contentWidth: width
+        contentHeight: body.implicitHeight + Style.space(38)
+        boundsBehavior: Flickable.StopAtBounds
+        clip: true
 
-        // WAKANDA4EVER - letter-spaced brand title
-        Text {
-          text: "W A K A N D A 4 E V E R"
-          color: root.fg
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.subtitle
-          font.weight: Font.DemiBold
-          font.letterSpacing: Style.space(3)
-        }
-        // brand subtitle
-        Text {
-          text: "persistent conversation dashboard"
-          color: root.muted
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
-          font.letterSpacing: Style.space(1)
-        }
+        ColumnLayout {
+          id: body
+          x: Style.space(20)
+          y: Style.space(16)
+          width: scroller.width - Style.space(40)
+          spacing: Style.space(10)
 
-        // -------- A little breathing room --------
-        Item { width: 1; height: Style.space(14) }
+          // -------- Brand title + daemon status pill --------
+          RowLayout {
+            Layout.fillWidth: true
+            spacing: Style.space(10)
 
-        // -------- HERO - prompt counts (Total & Today) --------
-        RowLayout {
-          Layout.alignment: Qt.AlignHCenter
-          spacing: Style.space(32)
+            ColumnLayout {
+              spacing: Style.space(2)
 
-          // Total Column
-          ColumnLayout {
-            spacing: Style.space(4)
-            Layout.alignment: Qt.AlignVCenter
-            Text {
-              text: root.total > 0 ? root.compact(root.total) : "0"
-              Layout.alignment: Qt.AlignHCenter
-              color: root.fg
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.displayLarge
-              font.weight: Font.DemiBold
+              // WAKANDA4EVER - letter-spaced brand title
+              Text {
+                text: "W A K A N D A 4 E V E R"
+                color: root.fg
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.subtitle
+                font.weight: Font.DemiBold
+                font.letterSpacing: Style.space(3)
+              }
+              // brand subtitle
+              Text {
+                text: "agentmemory conversation dashboard"
+                color: root.muted
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.letterSpacing: Style.space(1)
+              }
             }
-            Text {
-              text: root.total === 1 ? "PROMPT" : "PROMPTS"
-              Layout.alignment: Qt.AlignHCenter
-              color: root.muted
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.weight: Font.DemiBold
-              font.letterSpacing: Style.space(2)
-            }
+            Item { Layout.fillWidth: true }
+
+            // the live daemon state (healthy / attention / offline)
+            StatusPill { Layout.alignment: Qt.AlignVCenter }
           }
 
-          // Vertical Divider with equal horizontal margins
-          Item {
-            Layout.alignment: Qt.AlignVCenter
-            Layout.preferredWidth: 1
-            Layout.preferredHeight: Style.space(48)
-            Layout.leftMargin: Style.space(8)
-            Layout.rightMargin: Style.space(8)
+          // -------- HERO - the AgentMemory store at a glance --------
+          RowLayout {
+            Layout.fillWidth: true
+            Layout.topMargin: Style.space(4)
+            spacing: Style.space(14)
 
+            StatBlock {
+              Layout.fillWidth: true
+              value: root.countText("observations")
+              label: "OBSERVATIONS"
+              strong: true
+            }
             Rectangle {
-              anchors.fill: parent
+              Layout.preferredWidth: 1
+              Layout.preferredHeight: Style.space(40)
+              Layout.alignment: Qt.AlignVCenter
               color: root.alpha(root.chrome, 0.4)
             }
+            StatBlock {
+              Layout.fillWidth: true
+              value: root.countText("memories")
+              label: "MEMORIES"
+            }
+            Rectangle {
+              Layout.preferredWidth: 1
+              Layout.preferredHeight: Style.space(40)
+              Layout.alignment: Qt.AlignVCenter
+              color: root.alpha(root.chrome, 0.4)
+            }
+            StatBlock {
+              Layout.fillWidth: true
+              value: root.countText("sessions")
+              label: "SESSIONS"
+            }
           }
 
-          // Today Column
-          ColumnLayout {
-            spacing: Style.space(4)
-            Layout.alignment: Qt.AlignVCenter
-            Text {
-              text: root.today > 0 ? root.compact(root.today) : "0"
-              Layout.alignment: Qt.AlignHCenter
-              color: root.fg
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.displayLarge
-              font.weight: Font.DemiBold
+          // -------- The daemon's own headline (only when it needs attention) ----
+          Text {
+            Layout.fillWidth: true
+            visible: root.memoryOnline && root.memoryProblems > 0 && root.memoryHeadline !== ""
+            text: root.memoryHeadline
+            textFormat: Text.PlainText
+            color: root.alpha(root.urgent, 0.9)
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.WordWrap
+            maximumLineCount: 2
+            elide: Text.ElideRight
+          }
+
+          // -------- Secondary counters strip --------
+          Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: Style.space(46)
+            radius: Math.min(Style.cornerRadius, 9)
+            color: root.alpha(root.fg, 0.04)
+            border.width: 1
+            border.color: root.alpha(root.chrome, 0.3)
+
+            RowLayout {
+              anchors.fill: parent
+              anchors.margins: Style.space(7)
+              spacing: Style.space(6)
+
+              MiniStat {
+                Layout.fillWidth: true
+                value: root.countText("lessons")
+                label: "LESSONS"
+              }
+              MiniStat {
+                Layout.fillWidth: true
+                value: root.countText("crystals")
+                label: "CRYSTALS"
+              }
+              MiniStat {
+                Layout.fillWidth: true
+                value: root.total > 0 ? root.compact(root.total) : "0"
+                label: "PROMPTS"
+              }
+              MiniStat {
+                Layout.fillWidth: true
+                value: root.today > 0 ? root.compact(root.today) : "0"
+                label: "TODAY"
+              }
             }
+          }
+
+          // -------- Chapter divider --------
+          Rectangle {
+            Layout.fillWidth: true
+            height: 1
+            color: root.alpha(root.chrome, 0.35)
+          }
+
+          // -------- RECENT SESSIONS - section header --------
+          SectionHeader {
+            title: "RECENT SESSIONS"
+            hint: root.memoryOnline ? "agentmemory · latest 3" : "opencode · offline fallback"
+          }
+
+          // the latest 3 sessions (newest activity first)
+          SessionRow {
+            Layout.fillWidth: true
+            position: 0
+            modelData: root.sessionAt(0)
+            visible: !!modelData
+          }
+          SessionRow {
+            Layout.fillWidth: true
+            position: 1
+            modelData: root.sessionAt(1)
+            visible: !!modelData
+          }
+          SessionRow {
+            Layout.fillWidth: true
+            position: 2
+            modelData: root.sessionAt(2)
+            visible: !!modelData
+          }
+
+          // friendly empty-state placeholder (no sessions, or daemon offline)
+          Text {
+            Layout.fillWidth: true
+            visible: root.sessions.length === 0
+            text: root.memoryOnline
+              ? "Your latest sessions will appear here."
+              : "AgentMemory is offline — start the daemon to see its sessions."
+            color: root.muted
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.WordWrap
+          }
+
+          // -------- Chapter divider --------
+          Rectangle {
+            Layout.fillWidth: true
+            height: 1
+            color: root.alpha(root.chrome, 0.35)
+          }
+
+          // -------- MEMORY FOOTPRINT - section header --------
+          SectionHeader {
+            title: "MEMORY FOOTPRINT"
+            hint: "log-scaled · bounded by free space"
+          }
+
+          // the memory meter rows (agentmemory store, opencode database & files)
+          MeterRow {
+            Layout.fillWidth: true
+            modelData: root.fileAt(0)
+            visible: !!modelData
+          }
+          MeterRow {
+            Layout.fillWidth: true
+            modelData: root.fileAt(1)
+            visible: !!modelData
+          }
+          MeterRow {
+            Layout.fillWidth: true
+            modelData: root.fileAt(2)
+            visible: !!modelData
+          }
+
+          // -------- DISK - free / total space --------
+          RowLayout {
+            Layout.fillWidth: true
+            spacing: Style.space(8)
+
             Text {
-              text: "TODAY"
-              Layout.alignment: Qt.AlignHCenter
+              text: "DISK"
               color: root.muted
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
               font.weight: Font.DemiBold
               font.letterSpacing: Style.space(2)
+              Layout.alignment: Qt.AlignVCenter
+            }
+            Item { Layout.fillWidth: true }
+            // free space (accent-colored, right aligned)
+            Text {
+              text: root.diskInfo && root.diskInfo.free ? root.humanBytes(root.diskInfo.free) + " free" : "—"
+              textFormat: Text.PlainText
+              color: root.fg
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              Layout.alignment: Qt.AlignVCenter
+            }
+            // total space (muted)
+            Text {
+              text: root.diskInfo && root.diskInfo.total ? "of " + root.humanBytes(root.diskInfo.total) : ""
+              textFormat: Text.PlainText
+              color: root.muted
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              Layout.alignment: Qt.AlignVCenter
             }
           }
-        }
 
-        // -------- Flexible spacer --------
-        Item {
-          width: 1
-          Layout.fillHeight: true
-        }
-
-        // -------- Chapter divider --------
-        Rectangle {
-          Layout.fillWidth: true
-          height: 1
-          color: root.alpha(root.chrome, 0.35)
-        }
-
-        // -------- RECENT SESSIONS - section header --------
-        RowLayout {
-          Layout.fillWidth: true
+          // -------- Footer - version, uptime, notices & last check --------
           Text {
-            text: "RECENT SESSIONS"
-            color: root.muted
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            font.weight: Font.DemiBold
-            font.letterSpacing: Style.space(2)
-          }
-          Item { Layout.fillWidth: true }
-          Text {
-            text: "latest 3"
-            color: root.muted
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-        }
-
-        // the latest 3 sessions (sorted by most recent activity)
-        SessionRow {
-          Layout.fillWidth: true
-          position: 0
-          modelData: root.sessionAt(0)
-          visible: !!modelData
-        }
-        SessionRow {
-          Layout.fillWidth: true
-          position: 1
-          modelData: root.sessionAt(1)
-          visible: !!modelData
-        }
-        SessionRow {
-          Layout.fillWidth: true
-          position: 2
-          modelData: root.sessionAt(2)
-          visible: !!modelData
-        }
-
-        // friendly empty-state placeholder (when there are no sessions yet)
-        ColumnLayout {
-          visible: root.sessions.length === 0
-          Layout.fillWidth: true
-          Text {
-            text: "Your latest sessions will appear here."
-            color: root.muted
+            Layout.fillWidth: true
+            text: root.footerText()
+            visible: text !== ""
+            textFormat: Text.PlainText
+            color: root.alpha(root.fg, 0.6)
             font.family: root.fontFamily
             font.pixelSize: Style.font.bodySmall
-          }
-        }
-
-        // -------- Flexible spacer --------
-        Item {
-          width: 1
-          Layout.fillHeight: true
-        }
-
-        // -------- Chapter divider --------
-        Rectangle {
-          Layout.fillWidth: true
-          height: 1
-          color: root.alpha(root.chrome, 0.35)
-        }
-
-        // -------- MEMORY FOOTPRINT - section header --------
-        RowLayout {
-          Layout.fillWidth: true
-          Text {
-            text: "MEMORY FOOTPRINT"
-            color: root.muted
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            font.weight: Font.DemiBold
-            font.letterSpacing: Style.space(2)
-          }
-          Item { Layout.fillWidth: true }
-          Text {
-            text: "log-scaled · bounded by free space"
-            color: root.alpha(root.muted, 0.7)
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-        }
-
-        // the memory meter rows (conversation log, user memory, opencode database)
-        MeterRow {
-          Layout.fillWidth: true
-          modelData: root.fileAt(0)
-          visible: !!modelData
-        }
-        MeterRow {
-          Layout.fillWidth: true
-          modelData: root.fileAt(1)
-          visible: !!modelData
-        }
-        MeterRow {
-          Layout.fillWidth: true
-          modelData: root.fileAt(2)
-          visible: !!modelData
-        }
-
-        // -------- DISK - section header --------
-        RowLayout {
-          Layout.fillWidth: true
-          spacing: Style.space(8)
-
-          Text {
-            text: "DISK"
-            color: root.muted
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            font.weight: Font.DemiBold
-            font.letterSpacing: Style.space(2)
-            Layout.alignment: Qt.AlignVCenter
-          }
-          Item { Layout.fillWidth: true }
-          // free space (accent-colored, right aligned)
-          Text {
-            text: root.diskInfo && root.diskInfo.free ? root.humanBytes(root.diskInfo.free) + " free" : "—"
-            textFormat: Text.PlainText
-            color: root.fg
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            Layout.alignment: Qt.AlignVCenter
-          }
-          // total space (muted)
-          Text {
-            text: root.diskInfo && root.diskInfo.total ? "of " + root.humanBytes(root.diskInfo.total) : ""
-            textFormat: Text.PlainText
-            color: root.muted
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            Layout.alignment: Qt.AlignVCenter
+            elide: Text.ElideRight
           }
         }
       }

@@ -7,7 +7,7 @@
 # License: MIT
 #
 # Usage:
-#   1-|> python3 check-payload.py <payload.json>
+#   1-|> python3 check-payload.py <payload.json> [--online]
 #    -|> (asserts the dashboard JSON schema; exits 0 when all checks pass)
 #
 ##############################
@@ -27,15 +27,46 @@ def check(name, ok, detail=""):
 
 
 def main():
-    path = sys.argv[1] if len(sys.argv) > 1 else "payload.json"
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    online = "--online" in sys.argv[1:]
+    path = args[0] if args else "payload.json"
     with open(path, encoding="utf-8") as fh:
         payload = json.load(fh)
 
     check("payload is an object", isinstance(payload, dict))
 
     # ---- required top-level keys ----
-    for key in ("stats", "sessions", "files", "disk", "collectedAt", "error"):
+    for key in ("memory", "stats", "sessions", "files", "disk",
+                "collectedAt", "error"):
         check(f"has top-level key '{key}'", key in payload)
+
+    # ---- memory (AgentMemory daemon snapshot) ----
+    memory = payload.get("memory", {})
+    check("memory is an object", isinstance(memory, dict))
+    for key in ("online", "status", "version", "uptime", "counts",
+                "problems", "storeBytes", "checkedAt"):
+        check(f"memory has '{key}'", key in memory)
+    check("memory.online is a bool", isinstance(memory.get("online"), bool))
+    check("memory.counts is an object", isinstance(memory.get("counts"), dict))
+    if online:
+        check("memory.online is true with a live daemon",
+              memory.get("online") is True)
+        check("memory.status is healthy/warn",
+              memory.get("status") in ("healthy", "warn"), str(memory.get("status")))
+        check("memory.version is reported", bool(memory.get("version")),
+              str(memory.get("version")))
+        counts = memory.get("counts", {})
+        check("memory.counts.observations > 0",
+              (counts.get("observations") or 0) > 0,
+              f"observations={counts.get('observations')}")
+        check("memory.counts.memories > 0",
+              (counts.get("memories") or 0) > 0,
+              f"memories={counts.get('memories')}")
+    else:
+        check("memory.online is false without a daemon",
+              memory.get("online") is False)
+        check("memory.status is offline",
+              memory.get("status") == "offline", str(memory.get("status")))
 
     # ---- stats ----
     stats = payload.get("stats", {})
@@ -63,13 +94,16 @@ def main():
               all(dates), ", ".join(repr(d) for d in dates))
         check("no two sessions share a title",
               len(titles) == len(set(titles)))
+        if online:
+            check("sessions carry an observation count",
+                  all((t.get("observations") or 0) > 0 for t in sessions))
 
     # ---- files ----
     files = payload.get("files", [])
     check("files is a list", isinstance(files, list))
     check("files has exactly 3 entries", len(files) == 3, f"len={len(files)}")
     labels = [f.get("label") for f in files]
-    for want in ("conversation log", "user memory", "opencode database"):
+    for want in ("agentmemory store", "opencode database", "opencode memory"):
         check(f"files includes '{want}'", want in labels)
     check("files limits are positive",
           all((f.get("limit") or 0) > 0 for f in files))

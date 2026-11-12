@@ -4,7 +4,7 @@
   "name": "Wakanda4Ever",
   "version": "0.2.3",
   "author": "Abraham Ukachi",
-  "description": "Conversation dashboard: persistent prompt counts, latest session titles & timestamps, and storage footprint with themed progress bars.",
+  "description": "AgentMemory dashboard: daemon health & version, store counts, latest session titles & timestamps, and memory footprint with themed progress bars.",
   "kinds": [
     "panel",
     "bar-widget"
