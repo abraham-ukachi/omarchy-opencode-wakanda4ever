@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "wakanda4ever",
   "name": "Wakanda4Ever",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "author": "Abraham Ukachi",
   "description": "AgentMemory dashboard: daemon health & version, store counts, latest session titles & timestamps, and memory footprint with themed progress bars.",
   "kinds": [

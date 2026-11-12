@@ -2,6 +2,12 @@
 
 All notable changes to the **Wakanda4Ever** OpenCode conversation dashboard.
 
+## [0.2.4] - 2026-11-12
+
+### 🚀 Features
+
+- Read AgentMemory and rebuild the dashboard around it
+
 ## [0.2.3] - 2026-09-15
 
 ### 🚀 Features
